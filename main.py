@@ -1,9 +1,14 @@
-import customtkinter as ctk
-import random
-import perguntas_150
-import nomes
+"""Jogo do Milhão — jogo de perguntas e respostas com interface gráfica."""
 
-#Configuração visual 
+import random
+import importlib
+
+import customtkinter as ctk
+
+import banco_de_perguntas
+import ranking
+
+# Configuração visual 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -29,15 +34,18 @@ SAFE_LEVELS = {7, 11}
 
 
 class QuizApp(ctk.CTk):
+    """Janela principal do jogo: controla as telas e o estado da partida."""
+
     def __init__(self):
+        """Inicia a janela e abre a tela de nome."""
         super().__init__()
         self.title("Show do Milhão")
         self.geometry("980x680")
         self.minsize(880, 600)
         self.configure(fg_color=BG_DARK)
 
-        # ── Estado (espelha as variáveis do main.py) ─────────────────
-        self.ranking          = nomes.carregar_ranking()
+        # ── Estado da partida ─────────────────────────────────────
+        self.ranking          = ranking.carregar_ranking()
         self.pontos           = 0
         self.continua         = False
         self.perguntas        = []
@@ -57,6 +65,7 @@ class QuizApp(ctk.CTk):
     #tela de nome
 
     def _tela_nome(self):
+        """Exibe a tela inicial onde o jogador informa o nome."""
         self._limpar()
 
         frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -97,7 +106,7 @@ class QuizApp(ctk.CTk):
         ).pack()
 
     def _nome(self):
-        """def nome() do main.py"""
+        """Valida o nome digitado, reinicia o estado e inicia a partida."""
         nick = self.entry_nome.get().strip()
         if not nick:
             self.entry_nome.configure(border_color=RED_MISS)
@@ -109,7 +118,7 @@ class QuizApp(ctk.CTk):
         self.q_index       = 0
         self.help50_used   = False
         self.helpskip_used = False
-        self.perguntas     = list(perguntas_150.perguntas)
+        self.perguntas     = list(banco_de_perguntas.perguntas)
 
         self.ranking.append({'nickname': nick, 'record': 0})
 
@@ -119,6 +128,7 @@ class QuizApp(ctk.CTk):
     #tela do jogo
 
     def _tela_jogo(self):
+        """Monta a tela de jogo: escada de prêmios, painel, opções e auxílios."""
         self._limpar()
 
         root = ctk.CTkFrame(self, fg_color="transparent")
@@ -197,7 +207,6 @@ class QuizApp(ctk.CTk):
         opts_frame.columnconfigure(1, weight=1)
 
         self.opt_buttons = []
-        letras = ["A", "B", "C", "D", "E"]
         for i in range(5):
             
             if i < 4:
@@ -273,13 +282,11 @@ class QuizApp(ctk.CTk):
     #codigo
     
     def _escolha(self):
-        """def escolha() do main.py"""
+        """Sorteia a próxima pergunta e prepara as opções na tela."""
         if not self.perguntas:
             self._fim_de_jogo(vitoria=True)
             return
 
-        # pergunta = random.choice(perguntas_150.perguntas)
-        # perguntas_150.perguntas.remove(pergunta)
         self.pergunta_atual = random.choice(self.perguntas)
         self.perguntas.remove(self.pergunta_atual)
 
@@ -310,6 +317,7 @@ class QuizApp(ctk.CTk):
         self._atualizar_escada()
 
     def _selecionar(self, idx):
+        """Marca a opção escolhida pelo jogador e libera o botão de confirmação."""
         if self.confirmed or idx in self.hidden_opts:
             return
         self.selected_opt = idx
@@ -324,9 +332,7 @@ class QuizApp(ctk.CTk):
         self.btn_confirmar.configure(state="normal")
 
     def _confirmar(self):
-        """
-        Equivale ao bloco if/else de escolha() + def pontuação() do main.py
-        """
+        """Confere a resposta, atualiza a pontuação e decide se a partida continua."""
         if self.selected_opt is None or self.confirmed:
             return
         self.confirmed = True
@@ -366,7 +372,7 @@ class QuizApp(ctk.CTk):
             self.pontos = 0
 
         self.ranking[-1]["record"] = self.pontos
-        nomes.salvar_ranking(self.ranking)
+        ranking.salvar_ranking(self.ranking)
         self.q_index += 1
 
         if self.continua:
@@ -375,7 +381,7 @@ class QuizApp(ctk.CTk):
             self.after(1500, lambda: self._fim_de_jogo(vitoria=False))
 
     def _perguntar_continuar(self):
-        """input('Deseja jogar novamente? (s/n)') do main.py"""
+        """Abre a janela perguntando se o jogador deseja seguir na partida."""
         dialogo = ctk.CTkToplevel(self)
         dialogo.title("Continuar?")
         dialogo.geometry("340x180")
@@ -416,7 +422,7 @@ class QuizApp(ctk.CTk):
                       command=nao).pack(side="left", padx=6)
 
     def _ajuda_50(self):
-        """50/50: elimina 2 das 4 opções erradas (sobram 3 visíveis + correta)"""
+        """Auxílio 50/50: oculta duas das quatro alternativas erradas."""
         if self.help50_used or self.confirmed:
             return
         self.help50_used = True
@@ -438,6 +444,7 @@ class QuizApp(ctk.CTk):
                 self.btn_confirmar.configure(state="disabled")
 
     def _ajuda_pular(self):
+        """Auxílio Pular: descarta a pergunta atual e sorteia a próxima."""
         if self.helpskip_used or self.confirmed:
             return
         self.helpskip_used = True
@@ -447,6 +454,7 @@ class QuizApp(ctk.CTk):
         self._escolha()
 
     def _fim_de_jogo(self, vitoria):
+        """Exibe a tela de encerramento com a pontuação garantida."""
         self._limpar()
         nick   = self.ranking[-1]['nickname']
         pontos = self.ranking[-1]['record']
@@ -482,12 +490,12 @@ class QuizApp(ctk.CTk):
                       command=self._rank).pack()
 
     def _reiniciar(self):
-        import importlib
-        importlib.reload(perguntas_150)
+        """Recarrega o banco de perguntas e volta para a tela de nome."""
+        importlib.reload(banco_de_perguntas)
         self._tela_nome()
 
     def _rank(self):
-        """def rank() do main.py em janela popup"""
+        """Abre a janela com a classificação dos jogadores."""
         win = ctk.CTkToplevel(self)
         win.title("Ranking")
         win.geometry("400x500")
@@ -540,6 +548,7 @@ class QuizApp(ctk.CTk):
                       command=win.destroy).pack(pady=(0, 20))
 
     def _atualizar_escada(self):
+        """Atualiza a escada de prêmios conforme o avanço na partida."""
         for (idx, lbl) in self.prize_labels:
             if idx == self.q_index:
                 lbl.configure(
@@ -561,6 +570,7 @@ class QuizApp(ctk.CTk):
                 )
 
     def _limpar(self):
+        """Remove todos os widgets da janela antes de trocar de tela."""
         for w in self.winfo_children():
             w.destroy()
 
