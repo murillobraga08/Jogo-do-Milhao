@@ -5,5 +5,8 @@ __pycache__/
 # Ranking gerado em tempo de execução
 ranking.json
 
+# Ambiente virtual do projeto
+.venv/
+
 # Configurações locais do VSCode
 .vscode/
